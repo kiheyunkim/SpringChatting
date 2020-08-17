@@ -1,0 +1,144 @@
+<!--
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewprt" content="width=device-width, initial-scale=1.0">
+	<title>Chatting</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+	<script src="/js/chatting.js"></script>
+	<script src="/js/index.js"></script>
+
+	<link rel="stylesheet" type="text/css" href="css/index.css">
+	<link rel="stylesheet" type="text/css" href="css/media.css" media="(max-width:1024px)">
+
+	<link href="https://fonts.googleapis.com/css?family=Noto+Sans+KR:300,400,700|Noto+Serif+KR:300,400,700&display=swap" rel="stylesheet">
+</head>
+<body>
+	<section id="container">
+		<header>
+			<div class="mobilebar">
+				<button class="menu">
+					<span class="line"></span>
+					<span class="line"></span>
+					<span class="line"></span>
+				</button>
+			</div>
+		</header>
+		&lt;!&ndash; 메인 채팅 &ndash;&gt;
+		<article class="main">
+			&lt;!&ndash; 채팅창 &ndash;&gt;
+			<div class="box">
+				&lt;!&ndash; 채팅박스 &ndash;&gt;
+				<div class="chat">
+					<div id="text" class="content">
+
+					</div>
+					&lt;!&ndash; 스낵박스(재접속, 종료, 접속) &ndash;&gt;
+					&lt;!&ndash; 만약 하나를 보여야할 시 'snackshow' 클래스가 2초 동안 추가되도록 설정&ndash;&gt;
+					<div class="snack">
+						<span class="reconnect">재접속시도 중입니다.</span>
+						<span class="quit">종료되었습니다.</span>
+						<span class="connect">접속되었습니다.</span>
+						<span class="reconnectFail">재접속실패 종료되었습니다.</span>
+					</div>
+				</div>
+				&lt;!&ndash; 입력창 &ndash;&gt;
+				<div class="saying">
+					<textarea id = sendTextBox type = "text" style="resize: none;" name ='input' placeholder="내용을 입력하세요" onfocus="this.placeholder=''" ></textarea>&lt;!&ndash;
+				 &ndash;&gt;<button id = "sendBttn">send</button>&lt;!&ndash; 전송버튼 &ndash;&gt;
+				</div>
+			</div>
+			
+			&lt;!&ndash; 관리자용 채팅창? &ndash;&gt;
+		</article>
+		&lt;!&ndash; 참여 목록 &ndash;&gt;
+		<article class="slide">
+			<div class="box">
+				&lt;!&ndash; 참여자 검색 &ndash;&gt;
+				<div class="search">
+					<input type="text" name ='input' placeholder="참여자 검색" onfocus="this.placeholder=''" >
+				</div>
+				&lt;!&ndash; 참여자 목록(오름차순) &ndash;&gt;
+				<div class="talkerlist">
+					<ul id="list">
+						<li class="talker me">me</li>
+					</ul>
+				</div>
+			</div>
+		</article>
+	</section>
+</html>-->
+<!doctype html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport"
+		  content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Document</title>
+	<script>
+		var wsUri = "ws://127.0.0.1:8080/socket";
+		var output;
+		let webSocket;
+		let init = () => {
+			output = document.getElementById("output");
+			testWebSocket();
+		}
+
+		let writeToScreen = (message) => {
+			let pre = document.createElement("p");
+			pre.style.wordWrap="break-word";
+			pre.innerHTML = message;
+			output.appendChild(pre);
+		}
+
+		let doSend = (message) =>{
+			writeToScreen("발신: " + message);
+			webSocket.send(message);
+		}
+
+		let onOpen = (e) => {
+			writeToScreen("연결완료");
+			doSend("테스트 메세지");
+		}
+
+		let onClose = (e) => {
+			writeToScreen("연결해제");
+		}
+
+		let onMessage = (e) =>{
+			writeToScreen("<span style='color: blue;'>수신: " + e.data + "</span>")
+			webSocket.close();
+		}
+
+		let onError = (e) => {
+			writeToScreen('<span style="color: red;">에러:</span> ' + e.data);
+		}
+
+		let testWebSocket = () => {
+			webSocket = new WebSocket(wsUri);
+			webSocket.onopen = (e) => {
+				onOpen(e);
+			};
+			webSocket.onclose = (e) => {
+				onClose(e);
+			};
+			webSocket.onmessage = (e) =>{
+				onMessage(e);
+			}
+			webSocket.onerror = (e) =>{
+				onError(e);
+			}
+		}
+
+		window.addEventListener("load",init,false);
+
+	</script>
+</head>
+<body>
+	<h2>WebSocket Test</h2>
+	<div id ="output"></div>
+</body>
+</html>

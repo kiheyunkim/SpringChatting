@@ -3,17 +3,54 @@ package com.kiheyunkim.simplechatting.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
 
-import javax.websocket.Session;
+import javax.websocket.*;
+import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
+@Component
+@EnableWebSocket
+@ServerEndpoint(value = "/socket")
+public class Socket{
+    private Session session;
+    private static Set<Socket> listeners = new CopyOnWriteArraySet<>();
+    private Logger logger = LoggerFactory.getLogger(Socket.class);
+
+    @OnOpen
+    public void onOpen(Session session){
+        this.session = session;
+        listeners.add(this);
+        logger.info("onOpen called");
+    }
+
+    @OnClose
+    public void onClose(Session session){
+        listeners.remove(this);
+        logger.info("onClose called");
+    }
+
+    @OnMessage
+    public void onMessage(String message){
+        logger.info(message);
+        try {
+            session.getBasicRemote().sendText(message);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        logger.info("onMessage called");
+    }
+
+    @OnError
+    public void onError(Session session, Throwable throwable){
+        listeners.remove(this);
+        logger.info("onError called");
+    }
+}
+
+/*
 @Component
 public class WebSocketHandler extends TextWebSocketHandler {
     private List<WebSocketSession> sessionList = new ArrayList<>();
@@ -21,6 +58,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
     private WebSocketSession mySession;
 
     static private int counter = 0;
+
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -49,3 +87,4 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
     }
 }
+*/
