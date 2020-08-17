@@ -1,5 +1,9 @@
 package com.kiheyunkim.simplechatting.config;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -8,35 +12,95 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import javax.websocket.*;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 @Component
 @EnableWebSocket
 @ServerEndpoint(value = "/socket")
-public class Socket{
+public class Socket {
     private Session session;
-    private static Set<Socket> listeners = new CopyOnWriteArraySet<>();
-    private Logger logger = LoggerFactory.getLogger(Socket.class);
+    private String nickname = null;
+    private static final Set<Socket> listeners = new CopyOnWriteArraySet<>();
+    private final Logger logger = LoggerFactory.getLogger(Socket.class);
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    private void sendToMe(String message) throws IOException {
+        session.getBasicRemote().sendText(message);
+    }
+
+    private void sendToOthers(String type, String nickname, String message) throws IOException {
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("type", type);
+        JsonObject messageObject = new JsonObject();
+        messageObject.addProperty("nick", nickname);
+        messageObject.addProperty("msg", message);
+        jsonObject.add("message", messageObject);
+
+
+        logger.info("size: " + listeners.size());
+        listeners.forEach(listener -> {
+            try {
+                listener.session.getBasicRemote().sendText(jsonObject.toString());
+            } catch (IOException e) {
+                logger.warn("id: " + session.getId() + "error occurred");
+            }
+        });
+    }
 
     @OnOpen
-    public void onOpen(Session session){
+    public void onOpen(Session session) {
         this.session = session;
         listeners.add(this);
-        logger.info("onOpen called");
     }
 
     @OnClose
-    public void onClose(Session session){
+    public void onClose(Session session) {
         listeners.remove(this);
         logger.info("onClose called");
     }
 
     @OnMessage
-    public void onMessage(String message){
-        logger.info(message);
+    public void onMessage(String message) {
+        logger.info("msg: " + message);
+        JsonElement jsonElement = JsonParser.parseString(message);
+        JsonObject parsedMessage = jsonElement.getAsJsonObject();
+
+        String messageType = parsedMessage.get("request").getAsString();
+        String retval = null;
+        if (messageType.equals("connect")) {
+            JsonObject jsonObject = new JsonObject();
+            List<String> joinedList = new ArrayList<>();
+            nickname = "fucker";
+            listeners.forEach(e -> {
+                if (!e.getNickname().equals(this.nickname)) {
+                    joinedList.add(e.getNickname());
+                }
+            });
+            jsonObject.addProperty("type", "joinedList");
+            jsonObject.addProperty("joinedList", joinedList.toString());
+
+            retval = jsonObject.toString();
+        } else if (messageType.equals("message")) {
+            String msg = parsedMessage.get("message").getAsString();
+
+
+            try {
+                sendToOthers("message", this.getNickname(), msg);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
         try {
-            session.getBasicRemote().sendText(message);
+            session.getBasicRemote().sendText(retval);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -44,47 +108,9 @@ public class Socket{
     }
 
     @OnError
-    public void onError(Session session, Throwable throwable){
+    public void onError(Session session, Throwable throwable) {
         listeners.remove(this);
         logger.info("onError called");
+        logger.info(throwable.getMessage());
     }
 }
-
-/*
-@Component
-public class WebSocketHandler extends TextWebSocketHandler {
-    private List<WebSocketSession> sessionList = new ArrayList<>();
-    private Logger logger = LoggerFactory.getLogger(WebSocketHandler.class);
-    private WebSocketSession mySession;
-
-    static private int counter = 0;
-
-
-    @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        sessionList.add(session);
-        this.mySession = session;
-        logger.info("Connected : " + String.valueOf(counter));
-
-        Map<String, Object> attributes = session.getAttributes();
-        attributes.put("counter", counter);
-    }
-
-    @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        logger.info("Recv : " + session.getAttributes().get("counter") + " : " + message.getPayload());
-    }
-
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-        logger.info("Disonnected : " + session.getAttributes().get("counter"));
-        sessionList.remove(session);
-    }
-
-    public void sendMessage(String message) throws IOException {
-        if(mySession!=null){
-            mySession.sendMessage(new TextMessage(message));
-        }
-    }
-}
-*/

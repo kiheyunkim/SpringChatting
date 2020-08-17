@@ -2,7 +2,7 @@ let sendMessage;
 let max;
 
 let wsUri = "ws://127.0.0.1:8080/socket";
-Websocket websocket = new WebSocket()
+let webSocket = null;
 let AdjustCaretPoint =()=>{
     let height = $("#text").height();
     if(height > max) {
@@ -20,12 +20,9 @@ $(document).ready(()=>{
         },2000);
     }
 
-    const socket = io.connect('http://127.0.0.1:8080/send');
-
     max = $(".chat").height();
 
-    sendMessage = (message)=>{
-        // -> 전체에 메세지 보냄
+    sendMessage = (message) => {
         $('.chat #text').append(
             `
                 <div class="mychat">
@@ -34,86 +31,91 @@ $(document).ready(()=>{
             `
         );
         AdjustCaretPoint();
-        socket.emit('Msg', message);
-    };
-    
-    
+        let request = "message";
+        websocket.send(JSON.stringify({request, message}));
+    }
 
-    socket.on('connect',()=>{
-        setToast('connect');
-        socket.emit('GetList');
-    })
-    
-    socket.on('disconnect',(reason)=>{  //종료된 그순간 부터 나옴
-        console.log('disconnected Reason:',reason);
-        setToast('quit');
-        // -> 접속 끊어졌다고 알림
-    })
-    
-    socket.on('reconnect_attempt',(attemptCount)=>{
-        if(attemptCount > 5){
-            socket.disconnect();        //접속 완전종료
-            setToast('reconnectFail');
-            // -> 접속 완전히 종료됨을 알림 -> 재접속 실패.
-            return;
+    let setWebSocketReady = () => {
+        websocket = new WebSocket(wsUri);
+        websocket.onopen = (e) => {
+            setToast('connect');
+            websocket.send(JSON.stringify({request:"connect"}));
         }
-        // -> 접속 재시도를 말함
-        setToast('reconnect');
-        console.log('Trying to Connecting :'+ attemptCount);
-    });
-    
-    //Normal Message
-    socket.on('Msg',(message)=>{
-        // -> 일반 메세지 전송
-        let isSame=false;
-        let lastChatting = $('.chat #text > div').last();
-        if(lastChatting.attr('class') === 'youchat'){//연속해서 상대가 보냈나?
-            if(lastChatting.attr('id') === message.nick){//이전과 같음 판단
-                isSame=true;    //###########ID가 한글이 되지 않도록 처리해야함
+        websocket.onmessage = (e) => {
+            let data = JSON.parse(e.data);
+            console.log(data);
+            if(data.type === 'message'){
+                // -> 일반 메세지 전송
+                let isSame=false;
+                let message = data.message;
+                let lastChatting = $('.chat #text > div').last();
+                if(lastChatting.attr('class') === 'youchat'){//연속해서 상대가 보냈나?
+                    if(lastChatting.attr('id') === message.nick){//이전과 같음 판단
+                        isSame=true;    //###########ID가 한글이 되지 않도록 처리해야함
+                    }
+                }
+
+                $('.chat #text').append(
+                    `
+                        <div class="youchat" id=${message.nick}>
+                        ${!isSame ? `<label>${message.nick}</label>` : ''}
+                        <div>${message.msg}</div>
+                        </div>
+                    `
+                );
+                AdjustCaretPoint();
             }
-        }
-    
-        $('.chat #text').append(
-            `
-                <div class="youchat" id=${message.nick}>
-                ${!isSame ? `<label>${message.nick}</label>` : ''}
-                <div>${message.msg}</div>
-                </div>
-            `
-        );
-        AdjustCaretPoint();
-    });
-    
-    socket.on('Join',(nick)=>{
-        $('.talkerlist #list').append(
-            `
-                <li class="talker you">${nick}</li>
-            `
-        )
-    })
-    
-    socket.on('Exit',(nick)=>{
-        let list = $('.talkerlist #list li');
-        let length = list.length;
-    
-        for(let i=0;i<length;++i){
-            if($(list[i]).text() === nick){
-                $(list[i]).remove();
-                break;
+            else if(data.type === 'join'){
+                $('.talkerlist #list').append(
+                    `
+                        <li class="talker you">${nick}</li>
+                    `
+                );
             }
-        };
-    })
-    
-    socket.on('List',(clientList)=>{
-        let list = Array.from(clientList);
-        for(let i=0;i<list.length;++i){
-            $('.talkerlist #list').append(
-                `
-                    <li class="talker you">${list[i]}</li>
-                `
-            )
+            else if(data.type === 'exit'){
+                let list = $('.talkerlist #list li');
+                let length = list.length;
+
+                for(let i=0;i<length;++i){
+                    if($(list[i]).text() === nick){
+                        $(list[i]).remove();
+                        break;
+                    }
+                };
+            }
+            else if(data.type === 'joinedList'){
+                let list = data.joinedList.replace("[","").replace("]","").split();
+                for(let i=0;i<list.length;++i){
+                    $('.talkerlist #list').append(
+                        `
+                            <li class="talker you">${list[i]}</li>
+                        `
+                    )
+                }
+            }
+            console.log(data);
         }
-    })
+        websocket.onerror = (e) => {
+            /*socket.on('reconnect_attempt',(attemptCount)=>{
+                if(attemptCount > 5){
+                    socket.disconnect();        //접속 완전종료
+                    setToast('reconnectFail');
+                    // -> 접속 완전히 종료됨을 알림 -> 재접속 실패.
+                    return;
+                }
+                // -> 접속 재시도를 말함
+                setToast('reconnect');
+                console.log('Trying to Connecting :'+ attemptCount);
+            });*/
+            //onError(e);
+        }
+        websocket.onclose = (e) => {
+            console.log('disconnected Reason:',e);
+            setToast('quit');
+        }
+    }
+
+    setWebSocketReady();
 
     $(document).keyup((event)=>{
         if(event.keyCode === 13){

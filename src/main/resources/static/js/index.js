@@ -1,6 +1,6 @@
 $(document).ready(()=>{
     $('#sendBttn').click(()=>{
-        sendMessage($('#sendTextBox').val());
+        sendMessage((String)($('#sendTextBox').val()));
     });
 
     $('.menu').click(()=>{
