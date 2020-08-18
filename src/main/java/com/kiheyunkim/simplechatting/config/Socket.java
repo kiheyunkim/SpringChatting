@@ -22,7 +22,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 @ServerEndpoint(value = "/socket")
 public class Socket {
     private Session session;
-    private String nickname = null;
+    private String nickname = "fucker";
     private static final Set<Socket> listeners = new CopyOnWriteArraySet<>();
     private final Logger logger = LoggerFactory.getLogger(Socket.class);
 
@@ -34,21 +34,18 @@ public class Socket {
         session.getBasicRemote().sendText(message);
     }
 
-    private void sendToOthers(String type, String nickname, String message) throws IOException {
+    private void sendToOthers(String type, String message) throws IOException {
         JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("type", type);
-        JsonObject messageObject = new JsonObject();
-        messageObject.addProperty("nick", nickname);
-        messageObject.addProperty("msg", message);
-        jsonObject.add("message", messageObject);
+        jsonObject.addProperty("type",type);
+        jsonObject.addProperty("message", message);
 
-
-        logger.info("size: " + listeners.size());
         listeners.forEach(listener -> {
-            try {
-                listener.session.getBasicRemote().sendText(jsonObject.toString());
-            } catch (IOException e) {
-                logger.warn("id: " + session.getId() + "error occurred");
+            if(listener != this){
+                try {
+                    listener.session.getBasicRemote().sendText(jsonObject.toString());
+                } catch (IOException e) {
+                    logger.warn("id: " + session.getId() + "error occurred");
+                }
             }
         });
     }
@@ -57,12 +54,29 @@ public class Socket {
     public void onOpen(Session session) {
         this.session = session;
         listeners.add(this);
+
+        JsonObject returnObject = new JsonObject();
+        returnObject.addProperty("nick", getNickname());
+
+        try {
+            sendToOthers("join", returnObject.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @OnClose
     public void onClose(Session session) {
+        JsonObject returnObject = new JsonObject();
+        returnObject.addProperty("type", "joinedList");
+        returnObject.addProperty("joinedList", returnObject.toString());
+
+        try {
+            sendToMe(returnObject.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         listeners.remove(this);
-        logger.info("onClose called");
     }
 
     @OnMessage
@@ -72,9 +86,8 @@ public class Socket {
         JsonObject parsedMessage = jsonElement.getAsJsonObject();
 
         String messageType = parsedMessage.get("request").getAsString();
-        String retval = null;
         if (messageType.equals("connect")) {
-            JsonObject jsonObject = new JsonObject();
+            JsonObject returnObject = new JsonObject();
             List<String> joinedList = new ArrayList<>();
             nickname = "fucker";
             listeners.forEach(e -> {
@@ -82,29 +95,28 @@ public class Socket {
                     joinedList.add(e.getNickname());
                 }
             });
-            jsonObject.addProperty("type", "joinedList");
-            jsonObject.addProperty("joinedList", joinedList.toString());
-
-            retval = jsonObject.toString();
-        } else if (messageType.equals("message")) {
-            String msg = parsedMessage.get("message").getAsString();
-
+            returnObject.addProperty("type", "joinedList");
+            returnObject.addProperty("joinedList", joinedList.toString());
 
             try {
-                sendToOthers("message", this.getNickname(), msg);
-
+                sendToMe(returnObject.toString());
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            return;
-        }
 
-        try {
-            session.getBasicRemote().sendText(retval);
-        } catch (IOException e) {
-            e.printStackTrace();
+        } else if (messageType.equals("message")) {
+            String msg = parsedMessage.get("message").getAsString();
+
+            JsonObject returnObject = new JsonObject();
+            returnObject.addProperty("nick", nickname);
+            returnObject.addProperty("msg", msg);
+
+            try {
+                sendToOthers("message", returnObject.toString());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-        logger.info("onMessage called");
     }
 
     @OnError

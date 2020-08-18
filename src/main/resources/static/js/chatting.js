@@ -43,11 +43,10 @@ $(document).ready(()=>{
         }
         websocket.onmessage = (e) => {
             let data = JSON.parse(e.data);
-            console.log(data);
             if(data.type === 'message'){
                 // -> 일반 메세지 전송
                 let isSame=false;
-                let message = data.message;
+                let message = JSON.parse(data.message);
                 let lastChatting = $('.chat #text > div').last();
                 if(lastChatting.attr('class') === 'youchat'){//연속해서 상대가 보냈나?
                     if(lastChatting.attr('id') === message.nick){//이전과 같음 판단
@@ -66,6 +65,8 @@ $(document).ready(()=>{
                 AdjustCaretPoint();
             }
             else if(data.type === 'join'){
+                console.log(JSON.parse(data.message));
+                let nick = JSON.parse(data.message).nick;
                 $('.talkerlist #list').append(
                     `
                         <li class="talker you">${nick}</li>
@@ -73,6 +74,7 @@ $(document).ready(()=>{
                 );
             }
             else if(data.type === 'exit'){
+                let nick = data.nick;
                 let list = $('.talkerlist #list li');
                 let length = list.length;
 
@@ -84,16 +86,22 @@ $(document).ready(()=>{
                 };
             }
             else if(data.type === 'joinedList'){
-                let list = data.joinedList.replace("[","").replace("]","").split();
+
+                let list=[];
+                if(data.joinedList !== "[]"){
+                    list = data.joinedList.replace("[","").replace("]","").split();
+                }
+
+
                 for(let i=0;i<list.length;++i){
                     $('.talkerlist #list').append(
                         `
-                            <li class="talker you">${list[i]}</li>
-                        `
+                        <li class="talker you">${list[i]}</li>
+                    `
                     )
                 }
+
             }
-            console.log(data);
         }
         websocket.onerror = (e) => {
             /*socket.on('reconnect_attempt',(attemptCount)=>{
