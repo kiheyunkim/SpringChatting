@@ -90,15 +90,16 @@ $(document).ready(() => {
 
                 let list = [];
                 if (data.joinedList !== "[]") {
-                    list = data.joinedList.replace("[", "").replace("]", "").split();
+                    list = data.joinedList.replace("[", "").replace("]", "").split(',');
                 }
 
+                $('.me')[0].innerHTML = "me("+ data.nick + ")";
 
                 for (let i = 0; i < list.length; ++i) {
                     $('.talkerlist #list').append(
                         `
-                        <li class="talker you">${list[i]}</li>
-                    `
+                            <li class="talker you">${list[i]}</li>
+                        `
                     )
                 }
 

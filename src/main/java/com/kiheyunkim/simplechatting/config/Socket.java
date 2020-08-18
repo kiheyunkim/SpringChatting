@@ -24,6 +24,7 @@ public class Socket {
     private Session session;
     private String nickname = null;
     private static final Set<Socket> listeners = new CopyOnWriteArraySet<>();
+    private static final Set<String> nicknames = new CopyOnWriteArraySet<>();
     private final Logger logger = LoggerFactory.getLogger(Socket.class);
 
     public String getNickname() {
@@ -59,7 +60,16 @@ public class Socket {
     public void onOpen(Session session) {
         this.session = session;
         listeners.add(this);
-        nickname = Util.randomName();
+
+        while (true){
+            nickname = Util.randomName();
+
+            if(!nicknames.contains(nickname)){
+                nicknames.add(nickname);
+                break;
+            }
+        }
+
         JsonObject returnObject = new JsonObject();
         returnObject.addProperty("nick", getNickname());
 
@@ -71,7 +81,6 @@ public class Socket {
         listeners.remove(this);
         JsonObject returnObject = new JsonObject();
         returnObject.addProperty("nick", getNickname());
-
 
         sendToOthers("exit", returnObject.toString());
     }
@@ -92,6 +101,7 @@ public class Socket {
             });
             returnObject.addProperty("type", "joinedList");
             returnObject.addProperty("joinedList", joinedList.toString());
+            returnObject.addProperty("nick", getNickname());
 
             try {
                 sendToMe(returnObject.toString());
