@@ -3,6 +3,7 @@ package com.kiheyunkim.simplechatting.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.kiheyunkim.simplechatting.com.kiheyunkim.simplechatting.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -18,10 +19,10 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 @Component
 @EnableWebSocket
-@ServerEndpoint(value = "/socket/")
+@ServerEndpoint(value = "/socket")
 public class Socket {
     private Session session;
-    private String nickname = "fucker";
+    private String nickname = null;
     private static final Set<Socket> listeners = new CopyOnWriteArraySet<>();
     private final Logger logger = LoggerFactory.getLogger(Socket.class);
 
@@ -30,21 +31,21 @@ public class Socket {
     }
 
     private void sendToMe(String message) throws IOException {
-        if(session.isOpen()){
+        if (session.isOpen()) {
             session.getBasicRemote().sendText(message);
         }
     }
 
-    private void sendToOthers(String type, String message) throws IOException {
+    private void sendToOthers(String type, String message) {
         JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("type",type);
+        jsonObject.addProperty("type", type);
         jsonObject.addProperty("message", message);
 
         listeners.forEach(listener -> {
-            if(listener != this){
+            if (listener != this) {
                 try {
                     Session session = listener.session;
-                    if(session.isOpen()){
+                    if (session.isOpen()) {
                         session.getBasicRemote().sendText(jsonObject.toString());
                     }
                 } catch (IOException e) {
@@ -58,15 +59,11 @@ public class Socket {
     public void onOpen(Session session) {
         this.session = session;
         listeners.add(this);
-
+        nickname = Util.randomName();
         JsonObject returnObject = new JsonObject();
         returnObject.addProperty("nick", getNickname());
 
-        try {
-            sendToOthers("join", returnObject.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        sendToOthers("join", returnObject.toString());
     }
 
     @OnClose
@@ -75,11 +72,8 @@ public class Socket {
         JsonObject returnObject = new JsonObject();
         returnObject.addProperty("nick", getNickname());
 
-        try {
-            sendToOthers("exit", returnObject.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
+        sendToOthers("exit", returnObject.toString());
     }
 
     @OnMessage
@@ -91,7 +85,6 @@ public class Socket {
         if (messageType.equals("connect")) {
             JsonObject returnObject = new JsonObject();
             List<String> joinedList = new ArrayList<>();
-            nickname = "fucker";
             listeners.forEach(listener -> {
                 if (listener != this) {
                     joinedList.add(listener.getNickname());
@@ -113,11 +106,8 @@ public class Socket {
             returnObject.addProperty("nick", nickname);
             returnObject.addProperty("msg", msg);
 
-            try {
-                sendToOthers("message", returnObject.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            sendToOthers("message", returnObject.toString());
+
         }
     }
 
@@ -127,11 +117,7 @@ public class Socket {
         JsonObject returnObject = new JsonObject();
         returnObject.addProperty("nick", getNickname());
 
-        try {
-            sendToOthers("exit", returnObject.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        sendToOthers("exit", returnObject.toString());
 
         listeners.remove(this);
     }

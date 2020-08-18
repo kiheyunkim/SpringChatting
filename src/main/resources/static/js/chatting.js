@@ -47,7 +47,6 @@ $(document).ready(() => {
         }
         websocket.onmessage = (e) => {
             let data = JSON.parse(e.data);
-            console.log(data);
             if (data.type === 'message') {
                 // -> 일반 메세지 전송
                 let isSame = false;
@@ -76,7 +75,6 @@ $(document).ready(() => {
                     `
                 );
             } else if (data.type === 'exit') {
-                console.log(data);
                 let nick = JSON.parse(data.message).nick;
                 let list = $('.talkerlist #list li');
                 let length = list.length;
