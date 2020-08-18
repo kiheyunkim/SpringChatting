@@ -1,23 +1,25 @@
 let sendMessage;
 let max;
+let attemptCount = 0;
 
 let wsUri = "ws://127.0.0.1:8080/socket";
 let webSocket = null;
-let AdjustCaretPoint =()=>{
+let isErrorOccured = false;
+let AdjustCaretPoint = () => {
     let height = $("#text").height();
-    if(height > max) {
+    if (height > max) {
         $(".chat").scrollTop(height);
     }
 }
 
-$(document).ready(()=>{
-    let setToast=(type)=>{
+$(document).ready(() => {
+    let setToast = (type) => {
         let target = $(`.snack .${type}`);
-        target.attr('class','snackshow');
-    
+        target.attr('class', 'snackshow');
+
         window.setTimeout(() => {
-            target.attr('class',type);//되돌림
-        },2000);
+            target.attr('class', type);//되돌림
+        }, 2000);
     }
 
     max = $(".chat").height();
@@ -26,7 +28,7 @@ $(document).ready(()=>{
         $('.chat #text').append(
             `
                 <div class="mychat">
-                    <div>${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                    <div>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                 </div>
             `
         );
@@ -39,18 +41,21 @@ $(document).ready(()=>{
         websocket = new WebSocket(wsUri);
         websocket.onopen = (e) => {
             setToast('connect');
-            websocket.send(JSON.stringify({request:"connect"}));
+            attemptCount = 0;
+            isErrorOccured = false;
+            websocket.send(JSON.stringify({request: "connect"}));
         }
         websocket.onmessage = (e) => {
             let data = JSON.parse(e.data);
-            if(data.type === 'message'){
+            console.log(data);
+            if (data.type === 'message') {
                 // -> 일반 메세지 전송
-                let isSame=false;
+                let isSame = false;
                 let message = JSON.parse(data.message);
                 let lastChatting = $('.chat #text > div').last();
-                if(lastChatting.attr('class') === 'youchat'){//연속해서 상대가 보냈나?
-                    if(lastChatting.attr('id') === message.nick){//이전과 같음 판단
-                        isSame=true;    //###########ID가 한글이 되지 않도록 처리해야함
+                if (lastChatting.attr('class') === 'youchat') {//연속해서 상대가 보냈나?
+                    if (lastChatting.attr('id') === message.nick) {//이전과 같음 판단
+                        isSame = true;    //###########ID가 한글이 되지 않도록 처리해야함
                     }
                 }
 
@@ -63,37 +68,35 @@ $(document).ready(()=>{
                     `
                 );
                 AdjustCaretPoint();
-            }
-            else if(data.type === 'join'){
-                console.log(JSON.parse(data.message));
+            } else if (data.type === 'join') {
                 let nick = JSON.parse(data.message).nick;
                 $('.talkerlist #list').append(
                     `
                         <li class="talker you">${nick}</li>
                     `
                 );
-            }
-            else if(data.type === 'exit'){
-                let nick = data.nick;
+            } else if (data.type === 'exit') {
+                console.log(data);
+                let nick = JSON.parse(data.message).nick;
                 let list = $('.talkerlist #list li');
                 let length = list.length;
 
-                for(let i=0;i<length;++i){
-                    if($(list[i]).text() === nick){
+                for (let i = 0; i < length; ++i) {
+                    if ($(list[i]).text() === nick) {
                         $(list[i]).remove();
                         break;
                     }
-                };
-            }
-            else if(data.type === 'joinedList'){
+                }
+                ;
+            } else if (data.type === 'joinedList') {
 
-                let list=[];
-                if(data.joinedList !== "[]"){
-                    list = data.joinedList.replace("[","").replace("]","").split();
+                let list = [];
+                if (data.joinedList !== "[]") {
+                    list = data.joinedList.replace("[", "").replace("]", "").split();
                 }
 
 
-                for(let i=0;i<list.length;++i){
+                for (let i = 0; i < list.length; ++i) {
                     $('.talkerlist #list').append(
                         `
                         <li class="talker you">${list[i]}</li>
@@ -104,29 +107,32 @@ $(document).ready(()=>{
             }
         }
         websocket.onerror = (e) => {
-            /*socket.on('reconnect_attempt',(attemptCount)=>{
-                if(attemptCount > 5){
-                    socket.disconnect();        //접속 완전종료
-                    setToast('reconnectFail');
-                    // -> 접속 완전히 종료됨을 알림 -> 재접속 실패.
-                    return;
-                }
-                // -> 접속 재시도를 말함
-                setToast('reconnect');
-                console.log('Trying to Connecting :'+ attemptCount);
-            });*/
-            //onError(e);
+            isErrorOccured = true;
+            websocket.close();
         }
+
         websocket.onclose = (e) => {
-            console.log('disconnected Reason:',e);
-            setToast('quit');
+            if(!isErrorOccured){
+                return;
+            }
+
+            if (attemptCount > 5) {
+                websocket.close();
+                setToast('reconnectFail');
+                return;
+            }
+
+            ++attemptCount;
+            setWebSocketReady();
+            setToast('reconnect');
+            console.log('Trying to Connecting :' + attemptCount);
         }
     }
 
     setWebSocketReady();
 
-    $(document).keyup((event)=>{
-        if(event.keyCode === 13){
+    $(document).keyup((event) => {
+        if (event.keyCode === 13) {
             $('#sendBttn').click();
             $('#sendTextBox').val('');
             $('#sendTextBox').focus();
